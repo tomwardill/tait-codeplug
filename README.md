@@ -131,8 +131,8 @@ radio already provisioned for its environment. See the
 [library README](src/M0LTE.Tait.Codeplug/README.md#pdn-upgrade-profiles) for exactly what each one sets.
 
 `pdn-internal` is the one for a radio with a Packet.NET internal options board fitted: `pdn-extra` plus
-the data port on Internal Options, the audio taps for a sound-card modem (R2 out, busy-and-subaudible
-unmute, T13 in), and IOP_GPIO1 programmed as an active-low External PTT 1 input for the board's PTT line. The PTT line is also settable on its own:
+the data port on Internal Options, the audio taps for a sound-card modem (R2 out, unmuted except on
+PTT, T13 in), and IOP_GPIO1 programmed as an active-low External PTT 1 input for the board's PTT line. The PTT line is also settable on its own:
 `set radio.m8p gpio.iop_gpio1 ExternalPtt1Input` (or `Unassigned`, or `BusyStatusOutput` on a line that
 can be an output); `get radio.m8p | grep gpio` lists every line.
 
