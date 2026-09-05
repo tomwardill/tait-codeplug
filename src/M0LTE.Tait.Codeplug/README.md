@@ -73,11 +73,12 @@ prefer a clean flash of a full codeplug first, then apply a profile.
   output. The over-air baud must match at both ends; adjust the bauds and the data port for your setup.
 - **`pdn-internal`** is `pdn-extra` for a radio carrying a Packet.NET internal options board (a USB
   sound-card plus serial interface on the internal options connector). On top of `pdn-extra` it sets the
-  data port to Internal Options with no flow control, applies the packet audio routing (Rx tap-out R1
-  split with Except-on-PTT unmute, EPTT1 tap-in T13, the same block as `audio packet-defaults`), and
-  programs **IOP_GPIO1 as an active-low External PTT 1 input**, the line the board's PTT transistor pulls
-  low. Unlike the other two it does change the audio block and one digital I/O line, because the board
-  is nothing without them; RF configuration is still untouched.
+  data port to Internal Options with no flow control, routes the audio for a sound-card modem (Rx
+  tap-out **R2** split, flat discriminator audio, unmuted on busy detect and subaudible so the feed
+  follows the radio's squelch; EPTT1 tap-in T13 - the `audio packet-defaults` block with the tap point
+  and unmute condition changed), and programs **IOP_GPIO1 as an active-low External PTT 1 input**, the
+  line the board's PTT transistor pulls low. Unlike the other two it does change the audio block and one
+  digital I/O line, because the board is nothing without them; RF configuration is still untouched.
 
 ## Programmable I/O digital lines
 

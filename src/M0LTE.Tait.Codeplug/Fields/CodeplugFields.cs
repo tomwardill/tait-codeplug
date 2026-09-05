@@ -443,9 +443,13 @@ public sealed class CodeplugFields
     /// <see cref="ApplyPdnExtra"/> does, plus the settings that route the radio's data and audio to
     /// that connector and let the board key the transmitter. Sets the data port to Internal Options
     /// with no flow control (the CCDI and transparent-mode serial lines are IOP_TXD / IOP_RXD),
-    /// applies the packet audio routing of <see cref="ApplyPacketAudioDefaults"/> (Rx tap-out R1
-    /// split, EPTT1 tap-in T13), and programs IOP_GPIO1 as an active-low External PTT 1 input, which
-    /// is the line the board's PTT transistor pulls low. RF configuration is untouched.
+    /// routes the audio for a sound-card modem (Rx tap-out <b>R2</b>, flat discriminator audio ahead
+    /// of de-emphasis and filtering, type Split so the speaker keeps working, unmuted on busy detect
+    /// and subaudible so the feed follows the radio's own squelch; EPTT1 tap-in T13), and programs
+    /// IOP_GPIO1 as an active-low External PTT 1 input, the line the board's PTT transistor pulls
+    /// low. The audio block is the <see cref="ApplyPacketAudioDefaults"/> record with the tap-out
+    /// point and unmute condition changed, which is byte-for-byte the block a bench radio running a
+    /// tait-cm108 board carries. RF configuration is untouched.
     /// </summary>
     public void ApplyPdnInternal()
     {
@@ -453,6 +457,8 @@ public sealed class CodeplugFields
         DataPort = DataPort.InternalOptions;
         CommandModeFlowControl = DataFlowControl.None;
         ApplyPacketAudioDefaults();
+        SetRxTapOutNode(2);
+        TapOutUnmute = TapOutUnmute.BusyDetectSubaudible;
         SetDigitalIoRole(DigitalIoLine.IopGpio1, DigitalIoRole.ExternalPtt1Input);
     }
 

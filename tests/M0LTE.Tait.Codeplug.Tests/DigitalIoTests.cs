@@ -51,8 +51,11 @@ public class DigitalIoTests
         // the internal-options additions
         f.DataPort.Should().Be(DataPort.InternalOptions);
         f.CommandModeFlowControl.Should().Be(DataFlowControl.None);
-        f.GetRxTapOutNode().Should().Be(1);
+        f.GetRxTapOutNode().Should().Be(2);
+        f.TapOutUnmute.Should().Be(TapOutUnmute.BusyDetectSubaudible);
         f.GetEptt1TapInNode().Should().Be(13);
+        // the audio block a bench radio with the board fitted carries, byte for byte
+        Convert.ToHexString(f.Image.Require(0x3B, 0).Data).Should().Be("000100C2048000004000803A0020004000001000");
         f.GetDigitalIoRole(DigitalIoLine.IopGpio1).Should().Be(DigitalIoRole.ExternalPtt1Input);
         // and nothing else on the line table moved
         foreach (DigitalIoLine other in Enum.GetValues<DigitalIoLine>().Where(l => l != DigitalIoLine.IopGpio1))
