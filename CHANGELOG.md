@@ -4,6 +4,10 @@ What changed in each release. The section for a version is lifted into that vers
 
 Newest first. Add a section before tagging.
 
+## Unreleased
+
+- **Adding or deleting a channel now actually changes the radio.** The channel table and channel index grew and shrank correctly, but the entry counts for those two items in the item index (record 0x01) were left as they were. The radio sizes each item from that count, not from the bytes it is sent, so a two-channel write was accepted and committed and then read back as one channel: the added channel was silently dropped. Both counts now move with the channel count, the way the tone-table path already did. Bench-validated on a TM8100 (DBVer 0094): add a channel, write, power-cycle, read - byte-identical to what was sent; then delete it and the same again.
+
 ## 0.8.0 - 2026-08-21
 
 - **`tui --driver <name>`**, and `tui --driver list` to see what your platform offers. Terminal.Gui ships three console drivers (`windows`, `ansi`, `dotnet`) and picks one for you. Since a repaint costs whatever the driver and console between them make it cost, and that varies enormously, this makes it something you can change rather than something you are stuck with.

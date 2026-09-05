@@ -133,6 +133,7 @@ public sealed class CodeplugFields
         ResizeChannelTable(count + 1);
         CopyChannel(count - 1, count);
         WriteCibTable(count + 1);
+        SetChannelItemCounts(count + 1);
         return count;
     }
 
@@ -162,6 +163,7 @@ public sealed class CodeplugFields
 
         ResizeChannelTable(count - 1);
         WriteCibTable(count - 1);
+        SetChannelItemCounts(count - 1);
 
         if (HasGps
             && GpsPollResponseChannelType == GpsPollResponseChannelType.Dedicated
@@ -207,6 +209,19 @@ public sealed class CodeplugFields
             _channels.SetBits(destination + offset, width, _channels.GetBits(source + offset, width));
             offset += width;
         }
+    }
+
+    /// <summary>
+    /// Record the channel count in the item index (record 0x01) for both channel items. The radio
+    /// sizes each item's storage from its index entry, not from the bytes it is sent: bench-confirmed
+    /// on a TM8100 (DBVer 0094), a 2-channel table written with the index still saying 1 was accepted,
+    /// committed, and read back as one channel - the second was silently dropped. The CPS bumps the
+    /// same count when it grows a table, which is what the tone-table path already reproduces.
+    /// </summary>
+    private void SetChannelItemCounts(int channels)
+    {
+        SetItemCount(ChannelSection, channels);
+        SetItemCount(CibSection, channels);
     }
 
     /// <summary>

@@ -19,13 +19,57 @@ public class ChannelTableTests
     // Observed in ctcss-rx-values.m8p, a 6-channel CPS save.
     private const string RealSixChannelCib = "0000810081c0608040502800";
 
+    // The item index (record 0x01) as a real 1-channel radio readout carries it for the two channel
+    // items: 7 bytes each, ItemID, RecordSizeInBits (LE16), CurrentRecordCount (LE16), two more bytes.
+    // Item 05 (channel table) is 181 bits x 1, item 07 (CIB channel index) is 15 bits x 1.
+    private const string OneChannelItemIndex = "05B5000100080007" + "0F00010002" + "00";
+
     private static CodeplugFields OneChannel()
     {
         // 23 bytes = one 181-bit channel rounded up, which is exactly what a 1-channel CPS save carries.
         var image = new CodeplugImage(
             [new KeyValuePair<string, string>("DBVer", "0095")],
-            [new CodeplugRecord(0x05, 0, new byte[23]), new CodeplugRecord(0x07, 0, new byte[2])]);
+            [
+                new CodeplugRecord(0x01, 0, Convert.FromHexString(OneChannelItemIndex)),
+                new CodeplugRecord(0x05, 0, new byte[23]),
+                new CodeplugRecord(0x07, 0, new byte[2]),
+            ]);
         return CodeplugFields.Open(image);
+    }
+
+    private static int ItemCount(CodeplugFields fields, byte item)
+    {
+        byte[] index = fields.Image.SectionBytes(0x01);
+        for (int off = 0; off + 7 <= index.Length; off += 7)
+        {
+            if (index[off] == item)
+            {
+                return index[off + 3] | (index[off + 4] << 8);
+            }
+        }
+
+        throw new InvalidOperationException($"item {item:X2} not in the fixture's index");
+    }
+
+    [Fact]
+    public void Adding_and_removing_channels_keeps_the_item_index_counts_in_step()
+    {
+        // The radio sizes an item's storage from this count, not from the bytes it is sent: a table
+        // written with a stale count is accepted and then truncated to the old count on the radio.
+        CodeplugFields fields = OneChannel();
+        ItemCount(fields, 0x05).Should().Be(1);
+        ItemCount(fields, 0x07).Should().Be(1);
+
+        fields.AddChannel();
+        fields.AddChannel();
+
+        ItemCount(fields, 0x05).Should().Be(3);
+        ItemCount(fields, 0x07).Should().Be(3);
+
+        fields.RemoveChannel(0);
+
+        ItemCount(fields, 0x05).Should().Be(2);
+        ItemCount(fields, 0x07).Should().Be(2);
     }
 
     [Fact]
