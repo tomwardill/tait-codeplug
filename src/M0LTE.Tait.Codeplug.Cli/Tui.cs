@@ -28,6 +28,15 @@ internal static class Tui
 
     private static CodeplugImage? _image;
     private static CodeplugFields? _fields;
+
+    /// <summary>
+    /// The codeplug exactly as it came off the radio (or out of the file), serialised before any edit
+    /// could touch it. <see cref="CodeplugFields"/> edits <see cref="_image"/>'s records in place, so
+    /// by the time a write happens <see cref="_image"/> already carries the changes; the backup a
+    /// write takes has to come from this instead. Re-taken after a committed write, because from then
+    /// on the written image is what the radio holds.
+    /// </summary>
+    private static string? _preChangeM8p;
     private static bool _busy;
 
     private static readonly ObservableCollection<string> LogLines = [];
@@ -85,6 +94,7 @@ internal static class Tui
             if (initial is not null)
             {
                 _image = initial;
+                _preChangeM8p = initial.ToM8p();
                 Log($"loaded {source} ({initial.Records.Count} records).");
                 LoadFields();
             }
@@ -428,6 +438,7 @@ internal static class Tui
             image =>
             {
                 _image = image;
+                _preChangeM8p = image.ToM8p();
                 Log($"read {image.Records.Count} records, all checksums verified.");
                 LoadFields();
             });
@@ -474,9 +485,11 @@ internal static class Tui
         }
 
         // Golden rule 1: snapshot before writing. The image in hand is the radio's own bytes plus
-        // whatever was edited here, so the backup is taken from a re-decode of the original read.
+        // whatever was edited here, so it is NOT what the backup wants: that is the codeplug as it
+        // was before any edit, captured when it was read or loaded.
         CodeplugImage image = _image;
         CodeplugFields fields = _fields;
+        string preChange = _preChangeM8p ?? image.ToM8p();
 
         SetBusy(true, $"writing {port}...");
         CancellationToken token = BeginRadioOperation();
@@ -494,16 +507,20 @@ internal static class Tui
                 }
 
                 string backup = $"tait-codeplug-backup-{DateTime.UtcNow:yyyyMMddHHmmss}.m8p";
-                File.WriteAllText(backup, image.ToM8p());
+                File.WriteAllText(backup, preChange);
 
                 using var programmer = new TaitProgrammer(new SerialPortLine(port), HardwareOptions());
                 programmer.Progress += OnProgress;
                 int written = programmer.WriteImage(image, token);
-                return (backup, written);
+
+                // Committed: the radio now holds this image, so it is the pre-change state for the
+                // next write. Serialised here, before any further edit can touch the records.
+                return (backup, written, radioNow: image.ToM8p());
             },
             result =>
             {
-                Log($"backed up to {result.backup}");
+                _preChangeM8p = result.radioNow;
+                Log($"backed up the pre-change codeplug to {result.backup}");
                 if (presetIndex != 0)
                 {
                     Log($"applied preset {presetName}.");

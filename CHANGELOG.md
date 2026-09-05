@@ -4,6 +4,10 @@ What changed in each release. The section for a version is lifted into that vers
 
 Newest first. Add a section before tagging.
 
+## Unreleased
+
+- **The interactive mode's backup is now the pre-change codeplug.** It was meant to be, and the README says it is, but the write backed up the image it was about to send, which already carried every edit made in the editor: `CodeplugFields` edits the image's records in place, so by write time there was no unedited copy left to save. The backup now comes from a snapshot serialised the moment the codeplug is read from the radio or loaded from a file, before anything can touch it, and is re-taken after each committed write so a second write in the same session backs up what the radio actually held. The `patch` verb was never affected: it takes its own byte snapshot before editing.
+
 ## 0.8.0 - 2026-08-21
 
 - **`tui --driver <name>`**, and `tui --driver list` to see what your platform offers. Terminal.Gui ships three console drivers (`windows`, `ansi`, `dotnet`) and picks one for you. Since a repaint costs whatever the driver and console between them make it cost, and that varies enormously, this makes it something you can change rather than something you are stuck with.
