@@ -139,3 +139,78 @@ public enum TxInhibit : byte
     Busy = 1,
     Mute = 2,
 }
+
+/// <summary>The programmable digital I/O lines (Programmable I/O form, Digital tab), in the order the
+/// codeplug's line table (record 0x37) holds them: the seven auxiliary-connector lines, the seven
+/// internal-options-connector lines, then the control-head / microphone line.</summary>
+public enum DigitalIoLine
+{
+    /// <summary>Auxiliary connector pin 12, input only.</summary>
+    AuxGpi1 = 0,
+
+    /// <summary>Auxiliary connector pin 5, input only.</summary>
+    AuxGpi2 = 1,
+
+    /// <summary>Auxiliary connector pin 4, input only.</summary>
+    AuxGpi3 = 2,
+
+    /// <summary>Auxiliary connector pin 10.</summary>
+    AuxGpio4 = 3,
+
+    /// <summary>Auxiliary connector pin 2.</summary>
+    AuxGpio5 = 4,
+
+    /// <summary>Auxiliary connector pin 9.</summary>
+    AuxGpio6 = 5,
+
+    /// <summary>Auxiliary connector pin 1.</summary>
+    AuxGpio7 = 6,
+
+    /// <summary>Internal options connector pin 9.</summary>
+    IopGpio1 = 7,
+
+    /// <summary>Internal options connector pin 10.</summary>
+    IopGpio2 = 8,
+
+    /// <summary>Internal options connector pin 11.</summary>
+    IopGpio3 = 9,
+
+    /// <summary>Internal options connector pin 12.</summary>
+    IopGpio4 = 10,
+
+    /// <summary>Internal options connector pin 13.</summary>
+    IopGpio5 = 11,
+
+    /// <summary>Internal options connector pin 14.</summary>
+    IopGpio6 = 12,
+
+    /// <summary>Internal options connector pin 15.</summary>
+    IopGpio7 = 13,
+
+    /// <summary>Control-head connector GPIO1 (MIC_GPIO1 / PRG_GPIO1).</summary>
+    ChGpio1 = 14,
+}
+
+/// <summary>
+/// What a digital I/O line is configured to do. These are whole validated configurations of a line
+/// (direction, action, active level, debounce and action parameters together), not individual
+/// fields: the line's configuration bits are only mapped as complete patterns lifted from real CPS
+/// saves, the same way the packet audio preset is a validated record rather than a field map.
+/// </summary>
+public enum DigitalIoRole
+{
+    /// <summary>Not configured (the CPS default for every line).</summary>
+    Unassigned,
+
+    /// <summary>Input, action External PTT 1, active low. The configuration the TM8100 3DK manual
+    /// specifies for an external modem's PTT (Table 5.1: function EPTT1, active state Low), as the
+    /// CPS saves it.</summary>
+    ExternalPtt1Input,
+
+    /// <summary>Output, action Busy Status, as the CPS saves it.</summary>
+    BusyStatusOutput,
+
+    /// <summary>Configured to something this map does not recognise. Read-only: the bits are
+    /// preserved but cannot be described or set.</summary>
+    Other,
+}

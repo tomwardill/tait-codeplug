@@ -21,7 +21,7 @@ namespace M0LTE.Tait.Codeplug.Cli;
 /// </summary>
 internal static class Tui
 {
-    private static readonly string[] PresetLabels = ["none", "pdn-basic", "pdn-extra"];
+    private static readonly string[] PresetLabels = ["none", "pdn-basic", "pdn-extra", "pdn-internal"];
 
     /// <summary>Keep the log bounded: a session left open for hours should not grow a list view for ever.</summary>
     private const int MaxLogLines = 500;
@@ -259,9 +259,10 @@ internal static class Tui
             Y = 4,
             Width = Dim.Fill(),
             Height = Dim.Fill(),
-            Text = "Applied when you\nwrite. Neither preset\ntouches RF or channel\nconfig.\n\n"
+            Text = "Applied when you\nwrite. No preset\ntouches RF or channel\nconfig.\n\n"
                 + "basic: CCDI control\n(RSSI, power, status,\nPTT, DCD).\n\n"
-                + "extra: adds the\nTNC-less FFSK modem\nand SDM signalling.",
+                + "extra: adds the\nTNC-less FFSK modem\nand SDM signalling.\n\n"
+                + "internal: extra, on\nthe internal options\nboard: data port,\naudio taps, PTT line.",
         };
 
         TuiTheme.Panelise(preset);
@@ -491,6 +492,10 @@ internal static class Tui
                 else if (presetIndex == 2)
                 {
                     fields.ApplyPdnExtra();
+                }
+                else if (presetIndex == 3)
+                {
+                    fields.ApplyPdnInternal();
                 }
 
                 string backup = $"tait-codeplug-backup-{DateTime.UtcNow:yyyyMMddHHmmss}.m8p";

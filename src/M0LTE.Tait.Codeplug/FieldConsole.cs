@@ -122,6 +122,16 @@ public static class FieldConsole
         rows.Add(("tapunmute", f.TapOutUnmute.ToString()));
         rows.Add(("rxtapinverted", f.RxTapOutInverted ? "true" : "false"));
         rows.Add(("txtapinverted", f.Eptt1TapInInverted ? "true" : "false"));
+
+        // Programmable I/O, Digital tab (record 0x37; only if present)
+        if (f.HasDigitalIo)
+        {
+            foreach (DigitalIoLine line in System.Enum.GetValues<DigitalIoLine>())
+            {
+                rows.Add(("gpio." + DigitalIoName(line), f.GetDigitalIoRole(line).ToString()));
+            }
+        }
+
         return rows;
     }
 
@@ -254,6 +264,9 @@ public static class FieldConsole
             case "tapunmute": f.TapOutUnmute = Enum<TapOutUnmute>(value); return;
             case "rxtapinverted": f.RxTapOutInverted = Bool(value); return;
             case "txtapinverted": f.Eptt1TapInInverted = Bool(value); return;
+            case var gpio when gpio.StartsWith("gpio.", StringComparison.OrdinalIgnoreCase):
+                f.SetDigitalIoRole(DigitalIoLineNamed(gpio[5..]), Enum<DigitalIoRole>(value));
+                return;
             case "audio":
                 if (!string.Equals(value, "packet-defaults", StringComparison.OrdinalIgnoreCase))
                 {
@@ -267,7 +280,8 @@ public static class FieldConsole
                 {
                     case "pdn-basic": f.ApplyPdnBasic(); return;
                     case "pdn-extra": f.ApplyPdnExtra(); return;
-                    default: throw new FormatException("supported profiles: pdn-basic, pdn-extra");
+                    case "pdn-internal": f.ApplyPdnInternal(); return;
+                    default: throw new FormatException("supported profiles: pdn-basic, pdn-extra, pdn-internal");
                 }
 
             default: throw new FormatException($"unknown field '{name}'");
@@ -312,6 +326,40 @@ public static class FieldConsole
         {
             throw new FormatException($"tone must be like 'CTCSS 88.5', 'DCS 023', or 'None' (got '{value}')");
         }
+    }
+
+    /// <summary>The manual's name for a line, lower-cased: <c>aux_gpi1</c>, <c>iop_gpio1</c>, <c>ch_gpio1</c>.</summary>
+    private static string DigitalIoName(DigitalIoLine line) => line switch
+    {
+        DigitalIoLine.AuxGpi1 => "aux_gpi1",
+        DigitalIoLine.AuxGpi2 => "aux_gpi2",
+        DigitalIoLine.AuxGpi3 => "aux_gpi3",
+        DigitalIoLine.AuxGpio4 => "aux_gpio4",
+        DigitalIoLine.AuxGpio5 => "aux_gpio5",
+        DigitalIoLine.AuxGpio6 => "aux_gpio6",
+        DigitalIoLine.AuxGpio7 => "aux_gpio7",
+        DigitalIoLine.IopGpio1 => "iop_gpio1",
+        DigitalIoLine.IopGpio2 => "iop_gpio2",
+        DigitalIoLine.IopGpio3 => "iop_gpio3",
+        DigitalIoLine.IopGpio4 => "iop_gpio4",
+        DigitalIoLine.IopGpio5 => "iop_gpio5",
+        DigitalIoLine.IopGpio6 => "iop_gpio6",
+        DigitalIoLine.IopGpio7 => "iop_gpio7",
+        DigitalIoLine.ChGpio1 => "ch_gpio1",
+        _ => throw new ArgumentOutOfRangeException(nameof(line), line, "unknown line"),
+    };
+
+    private static DigitalIoLine DigitalIoLineNamed(string name)
+    {
+        foreach (DigitalIoLine line in System.Enum.GetValues<DigitalIoLine>())
+        {
+            if (string.Equals(DigitalIoName(line), name, StringComparison.OrdinalIgnoreCase))
+            {
+                return line;
+            }
+        }
+
+        throw new FormatException($"unknown digital I/O line '{name}' (aux_gpi1..3, aux_gpio4..7, iop_gpio1..7, ch_gpio1)");
     }
 
     private static string Int(long v) => v.ToString(CultureInfo.InvariantCulture);

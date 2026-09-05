@@ -34,7 +34,7 @@ both in the packet.net repo where this code started life.
   one data/signalling record; the GPS and Customer Data tabs are separate records; plus the unit data
   identity), and audio taps. Each field is pinned by a test.
 - `FieldConsole` - name/value access used by the `dump`/`get`/`set` CLI verbs.
-- `CodeplugFields.ApplyPdnBasic()` / `ApplyPdnExtra()` - the two PDN upgrade profiles (see below).
+- `CodeplugFields.ApplyPdnBasic()` / `ApplyPdnExtra()` / `ApplyPdnInternal()` - the PDN upgrade profiles (see below).
 - `ISerialLine` / `SerialPortLine` - the byte seam (mirrors `Packet.Radio.Tait.ISerialIo`); tests
   substitute a scripted mock radio.
 - `TaitProgrammer` - the lock-step transport state machine (connect, interrogate, read, write).
@@ -71,6 +71,26 @@ prefer a clean flash of a full codeplug first, then apply a profile.
   transport can escape back to command mode - without this the radio wedges), ignore-subaudible on the
   data path, the transparent terminal baud (28800) and over-air FFSK baud (2400), and SDM + CCDI SDM
   output. The over-air baud must match at both ends; adjust the bauds and the data port for your setup.
+- **`pdn-internal`** is `pdn-extra` for a radio carrying a Packet.NET internal options board (a USB
+  sound-card plus serial interface on the internal options connector). On top of `pdn-extra` it sets the
+  data port to Internal Options with no flow control, applies the packet audio routing (Rx tap-out R1
+  split with Except-on-PTT unmute, EPTT1 tap-in T13, the same block as `audio packet-defaults`), and
+  programs **IOP_GPIO1 as an active-low External PTT 1 input**, the line the board's PTT transistor pulls
+  low. Unlike the other two it does change the audio block and one digital I/O line, because the board
+  is nothing without them; RF configuration is still untouched.
+
+## Programmable I/O digital lines
+
+The Digital tab of the Programmable I/O form is record 0x37: one variable-length entry per line (a
+6-bit line index, an 8-bit label length, the CPS "Pin" label as 7-bit ASCII, then 62 configuration
+bits), fifteen entries on a TM8100. The 62 configuration bits are **not** mapped field by field. What
+`CodeplugFields` knows are whole-line configurations lifted byte-for-byte from real CPS saves, exposed as
+`DigitalIoRole`: `Unassigned` (the default for every line), `ExternalPtt1Input` (Input, External PTT 1,
+active low - the configuration Tait's 3DK manual specifies for an external modem's PTT, as saved by the
+CPS in the TARPN TM8105 template), and `BusyStatusOutput` (Output, Busy Status). Anything else reads as
+`Other`, is preserved untouched, and cannot be written. `GetDigitalIoRole` / `SetDigitalIoRole` take a
+`DigitalIoLine`; the console names them `gpio.aux_gpi1` .. `gpio.aux_gpio7`, `gpio.iop_gpio1` ..
+`gpio.iop_gpio7` and `gpio.ch_gpio1`.
 
 ## Status and safety
 

@@ -382,6 +382,7 @@ static void PrintUsage()
     Console.WriteLine("PDN upgrade profiles (leave RF/channels untouched; adjust data port + bauds for your setup):");
     Console.WriteLine("  pdn-basic   CCDI telemetry + control: RSSI, forward/reverse power, status, PTT, DCD");
     Console.WriteLine("  pdn-extra   pdn-basic + the TNC-less internal FFSK packet modem and SDM mode signalling");
+    Console.WriteLine("  pdn-internal pdn-extra + data port Internal Options, packet audio taps, IOP_GPIO1 = External PTT 1");
     Console.WriteLine();
     Console.WriteLine("the radio must be latched into programming mode (power-cycle as you trigger).");
 }

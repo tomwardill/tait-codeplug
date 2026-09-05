@@ -4,6 +4,12 @@ What changed in each release. The section for a version is lifted into that vers
 
 Newest first. Add a section before tagging.
 
+## Unreleased
+
+- **A `pdn-internal` profile**, for a radio with a Packet.NET internal options board (USB sound-card plus serial on the internal options connector). It is `pdn-extra` plus the three things that board needs and the CPS was the only way to set: data port Internal Options (flow control None), the packet audio taps (the `audio packet-defaults` block: Rx tap-out R1 split, EPTT1 tap-in T13), and IOP_GPIO1 as an active-low External PTT 1 input. In the TUI preset list, and `set <file> profile pdn-internal` / `patch <port> profile pdn-internal` from the command line.
+- **The Programmable I/O digital lines are readable and, for the roles a packet station needs, settable.** Record 0x37 decodes as fifteen variable-length entries (line index, label length, the CPS "Pin" label in 7-bit ASCII, 62 configuration bits), which is what let the lines be told apart. The configuration bits are mapped as whole validated patterns rather than fields - `Unassigned`, `ExternalPtt1Input`, `BusyStatusOutput`, lifted from a factory-default readout and the TARPN TM8105 CPS template - so `gpio.iop_gpio1` and friends read one of those (or `Other` for anything unmapped, which is preserved and refused for writing). Setting a role rewrites exactly that line's 62 bits and nothing else, and writing `ExternalPtt1Input` onto AUX_GPI1 of a default table reproduces the TARPN template's bytes.
+- Bench status of the PTT line (TM8110, DBVer 0094): `gpio.iop_gpio1 ExternalPtt1Input` written and read back byte-identical, radio boots normally, answers CCDI on the internal options port, and reports no PTT at rest (so the line is not active-high). The key-up itself through an internal options board is the remaining check.
+
 ## 0.8.0 - 2026-08-21
 
 - **`tui --driver <name>`**, and `tui --driver list` to see what your platform offers. Terminal.Gui ships three console drivers (`windows`, `ansi`, `dotnet`) and picks one for you. Since a repaint costs whatever the driver and console between them make it cost, and that varies enormously, this makes it something you can change rather than something you are stuck with.

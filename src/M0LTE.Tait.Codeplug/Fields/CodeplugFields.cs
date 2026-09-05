@@ -437,6 +437,25 @@ public sealed class CodeplugFields
         CcdiSdmOutputEnabled = true;
     }
 
+    /// <summary>
+    /// Upgrade the codeplug for a radio carrying a Packet.NET internal options board (a USB
+    /// sound-card and serial interface on the internal options connector): everything
+    /// <see cref="ApplyPdnExtra"/> does, plus the settings that route the radio's data and audio to
+    /// that connector and let the board key the transmitter. Sets the data port to Internal Options
+    /// with no flow control (the CCDI and transparent-mode serial lines are IOP_TXD / IOP_RXD),
+    /// applies the packet audio routing of <see cref="ApplyPacketAudioDefaults"/> (Rx tap-out R1
+    /// split, EPTT1 tap-in T13), and programs IOP_GPIO1 as an active-low External PTT 1 input, which
+    /// is the line the board's PTT transistor pulls low. RF configuration is untouched.
+    /// </summary>
+    public void ApplyPdnInternal()
+    {
+        ApplyPdnExtra();
+        DataPort = DataPort.InternalOptions;
+        CommandModeFlowControl = DataFlowControl.None;
+        ApplyPacketAudioDefaults();
+        SetDigitalIoRole(DigitalIoLine.IopGpio1, DigitalIoRole.ExternalPtt1Input);
+    }
+
     /// <summary>Clear a channel's RX subaudible signalling.</summary>
     public void SetRxSubaudibleNone(int channel) => SetRxSubaudibleType(channel, SubaudibleType.None);
 
@@ -1622,6 +1641,136 @@ public sealed class CodeplugFields
     }
 
     // ---- Audio tap block (record 0x3B/0) ------------------------------------------------
+
+    // ---- Programmable I/O: digital lines (record 0x37, item 55) ----------------------------------
+    //
+    // One entry per line, fifteen on a TM8100 (AUX_GPI1-3, AUX_GPIO4-7, IOP_GPIO1-7, CH_GPIO1), packed
+    // as a contiguous LSB-first bit-stream of variable-length entries: a 6-bit line index, an 8-bit
+    // label length, the label as 7-bit ASCII (the CPS's "Pin" column - "PIN_12", "C_HEAD"), then 62
+    // bits of configuration (direction, action, active level, debounce, action parameters). The
+    // structure was recovered from the labels: an entry with a 6-character label is 118 bits and one
+    // with a 5-character label 111, and fifteen of them tile the 216-byte item exactly.
+    //
+    // The 62 configuration bits are not mapped field by field. What is known are whole-line patterns
+    // lifted from real CPS saves (the TARPN TM8105 template, DBVer 0095, and a factory-default radio
+    // readout, DBVer 0094), which is enough to recognise and set the roles a packet station needs.
+
+    private const byte DigitalIoSection = 0x37;
+    private const int DigitalIoHeaderBits = 14;
+    private const int DigitalIoConfigBits = 62;
+
+    // The configuration patterns, as 62-bit LSB-first values.
+    private const ulong DigitalIoUnassigned = 0x0000A8;        // every line of a default codeplug
+    private const ulong DigitalIoExternalPtt1Input = 0x4920A1; // AUX_GPI1 in the TARPN template
+    private const ulong DigitalIoBusyStatusOutput = 0x0000A2;  // IOP_GPIO2 in the TARPN template
+
+    private readonly record struct DigitalIoEntry(int Index, string Label, int ConfigBitOffset);
+
+    /// <summary>True when the codeplug carries the digital I/O line table (record 0x37).</summary>
+    public bool HasDigitalIo => HasRecord(DigitalIoSection, 0);
+
+    /// <summary>The CPS "Pin" label of a line, e.g. <c>PIN_9</c> for IOP_GPIO1 or <c>C_HEAD</c>.</summary>
+    public string GetDigitalIoLabel(DigitalIoLine line) => DigitalIoEntryFor(line, out _).Label;
+
+    /// <summary>What a digital I/O line is configured as. <see cref="DigitalIoRole.Other"/> means a
+    /// configuration this map does not recognise; its bits are preserved untouched.</summary>
+    public DigitalIoRole GetDigitalIoRole(DigitalIoLine line)
+    {
+        DigitalIoEntry entry = DigitalIoEntryFor(line, out ChannelBits bits);
+        return (ulong)bits.GetBits(entry.ConfigBitOffset, DigitalIoConfigBits) switch
+        {
+            DigitalIoUnassigned => DigitalIoRole.Unassigned,
+            DigitalIoExternalPtt1Input => DigitalIoRole.ExternalPtt1Input,
+            DigitalIoBusyStatusOutput => DigitalIoRole.BusyStatusOutput,
+            _ => DigitalIoRole.Other,
+        };
+    }
+
+    /// <summary>Configure a digital I/O line. Rewrites only that line's 62 configuration bits; the
+    /// line index and label, and every other line, are left exactly as they were.</summary>
+    /// <exception cref="ArgumentException">The role is <see cref="DigitalIoRole.Other"/>, which has
+    /// no bit pattern to write, or an input-only line (AUX_GPI1-3) is asked to be an output.</exception>
+    public void SetDigitalIoRole(DigitalIoLine line, DigitalIoRole role)
+    {
+        ulong pattern = role switch
+        {
+            DigitalIoRole.Unassigned => DigitalIoUnassigned,
+            DigitalIoRole.ExternalPtt1Input => DigitalIoExternalPtt1Input,
+            DigitalIoRole.BusyStatusOutput => DigitalIoBusyStatusOutput,
+            _ => throw new ArgumentException($"{role} is not a configuration that can be written", nameof(role)),
+        };
+
+        if (role == DigitalIoRole.BusyStatusOutput && line is DigitalIoLine.AuxGpi1 or DigitalIoLine.AuxGpi2 or DigitalIoLine.AuxGpi3)
+        {
+            throw new ArgumentException($"{line} is an input-only line and cannot be an output", nameof(line));
+        }
+
+        byte[] table = Image.SectionBytes(DigitalIoSection);
+        DigitalIoEntry entry = ParseDigitalIoTable(table)[(int)line];
+        new ChannelBits([table]).SetBits(entry.ConfigBitOffset, DigitalIoConfigBits, (long)pattern);
+        Image.SetSectionBytes(DigitalIoSection, table);
+    }
+
+    private DigitalIoEntry DigitalIoEntryFor(DigitalIoLine line, out ChannelBits bits)
+    {
+        byte[] table = Image.SectionBytes(DigitalIoSection);
+        bits = new ChannelBits([table]);
+        return ParseDigitalIoTable(table)[(int)line];
+    }
+
+    /// <summary>Walk the variable-length entries. Throws if the bytes do not have the recognised
+    /// shape, so a differently laid-out table is refused rather than misread.</summary>
+    private static DigitalIoEntry[] ParseDigitalIoTable(byte[] table)
+    {
+        if (table.Length == 0)
+        {
+            throw new InvalidOperationException("this codeplug has no digital I/O line table (record 0x37)");
+        }
+
+        var bits = new ChannelBits([table]);
+        int total = table.Length * 8;
+        int lines = Enum.GetValues<DigitalIoLine>().Length;
+        var entries = new DigitalIoEntry[lines];
+        int pos = 0;
+        for (int i = 0; i < lines; i++)
+        {
+            if (pos + DigitalIoHeaderBits > total)
+            {
+                throw new NotSupportedException($"digital I/O table ends after {i} lines; {lines} expected");
+            }
+
+            int index = (int)bits.GetBits(pos, 6);
+            int length = (int)bits.GetBits(pos + 6, 8);
+            int labelAt = pos + DigitalIoHeaderBits;
+            int configAt = labelAt + (7 * length);
+            if (length is < 1 or > 16 || configAt + DigitalIoConfigBits > total)
+            {
+                throw new NotSupportedException($"digital I/O table entry {i} has an unrecognised shape");
+            }
+
+            var label = new char[length];
+            for (int c = 0; c < length; c++)
+            {
+                long ch = bits.GetBits(labelAt + (7 * c), 7);
+                if (ch is < 0x20 or > 0x7E)
+                {
+                    throw new NotSupportedException($"digital I/O table entry {i} has a non-text label");
+                }
+
+                label[c] = (char)ch;
+            }
+
+            entries[i] = new DigitalIoEntry(index, new string(label), configAt);
+            pos = configAt + DigitalIoConfigBits;
+        }
+
+        if (total - pos >= 8)
+        {
+            throw new NotSupportedException("digital I/O table has more entries than this map knows");
+        }
+
+        return entries;
+    }
 
     private byte[] Audio => Image.Require(0x3B, 0).Data;
 

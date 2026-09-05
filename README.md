@@ -45,6 +45,7 @@ Run it with no arguments and you get a screen instead of a verb: pick a port, re
 ││ #   RX (MHz)      TX (MHz)      Bandwidth  Power           ││ ◉ none                   ││
 ││ 0   144.812500    (= RX)        Narrow     High            ││ ○ pdn-basic              ││
 ││                                                            ││ ○ pdn-extra              ││
+││ ○ pdn-internal           ││
 ││                                                            ││                          ││
 ││                                                            ││ Applied when you         ││
 ││                                                            ││ write. Neither preset    ││
@@ -123,11 +124,17 @@ prompts go to stderr, so `read <port> > radio.m8p` gives you a clean `.m8p` on s
 
 ## PDN upgrade profiles
 
-`pdn-basic` and `pdn-extra` upgrade a radio to the [Packet.NET](https://github.com/packet-net/packet.net)
+`pdn-basic`, `pdn-extra` and `pdn-internal` upgrade a radio to the [Packet.NET](https://github.com/packet-net/packet.net)
 feature set - CCDI telemetry and control, and the TNC-less internal FFSK packet modem plus SDM mode
 signalling - **without touching RF config** (channels, frequencies, power), so they layer safely onto a
 radio already provisioned for its environment. See the
 [library README](src/M0LTE.Tait.Codeplug/README.md#pdn-upgrade-profiles) for exactly what each one sets.
+
+`pdn-internal` is the one for a radio with a Packet.NET internal options board fitted: `pdn-extra` plus
+the data port on Internal Options, the packet audio taps, and IOP_GPIO1 programmed as an active-low
+External PTT 1 input for the board's PTT line. The PTT line is also settable on its own:
+`set radio.m8p gpio.iop_gpio1 ExternalPtt1Input` (or `Unassigned`, or `BusyStatusOutput` on a line that
+can be an output); `get radio.m8p | grep gpio` lists every line.
 
 ## Safety
 
